@@ -1,0 +1,242 @@
+-- Below code is for create Air Pollution Database
+
+CREATE DATABASE AirPollution;
+GO
+
+USE AirPollution;
+
+GO
+
+CREATE TABLE BatonRouge  (
+	City Varchar(50),
+	Date DATE,
+	PM25 FLOAT,
+	PRIMARY KEY (Date, City));
+
+GO
+ 
+USE AirPollution;
+GO
+
+-- Import the file using BULK INSERT
+BULK INSERT BatonRouge
+FROM 'C:\Users\templatelogin\Desktop\AirPollution_LungCancer_Datasets\DEQ_Datasets_2011to2021\BT_Data_AirPollution_2011_2018.csv'
+WITH
+(
+    FIELDTERMINATOR = ',',
+    ROWTERMINATOR = '\n',
+    FIRSTROW = 2
+);
+
+
+-- Below code is for create Lung Cancer Database
+
+CREATE DATABASE LungCancer;
+
+GO
+
+USE LungCancer;
+
+GO
+
+CREATE TABLE LungCancerRates (
+	Year smallint,
+	Parish Varchar(50),
+	Rate FLOAT,
+	CountOfCases INT,
+	Population int,
+	PRIMARY KEY (Year, Parish));
+
+GO
+ 
+USE LungCancer;
+
+GO 
+
+-- import the file in query way
+BULK INSERT LungCancerRates
+FROM 'C:\Users\templatelogin\Desktop\AirPollution_LungCancer_Datasets\LSUHS_Lung_Cancer_Incidence_Rates_by_Parish_2010_2020.csv'
+WITH
+(
+    FIELDTERMINATOR = ',',
+    ROWTERMINATOR = '\n',
+    FIRSTROW = 2
+)
+GO
+
+-- Below code is for create Location Database
+
+CREATE DATABASE Location;
+GO
+
+USE Location;
+
+GO
+
+CREATE TABLE CityToParish (
+	City Varchar(50),
+	Parish Varchar(50),
+	PRIMARY KEY (City, Parish));
+GO
+ 
+USE Location;
+
+GO 
+
+-- import the file in query way
+BULK INSERT CityToParish
+FROM 'C:\Users\templatelogin\Desktop\AirPollution_LungCancer_Datasets\CityToParish.csv'
+WITH
+(
+    FIELDTERMINATOR = ',',
+    ROWTERMINATOR = '\n',
+    FIRSTROW = 2
+)
+GO
+
+------------------------------------------------------------------------------
+
+-- Stored Procedure for getting the highest number of cases for specific year for specific location
+CREATE or ALTER PROCEDURE Highest_Lung_Cancer_Cases
+@Highest_Year INT OUTPUT,
+@Highest_City VARCHAR(50) OUTPUT
+AS
+BEGIN
+SELECT TOP 1 @Highest_Year = lc.Year, @Highest_City = cp.City
+FROM LungCancer.dbo.LungCancerRates lc
+JOIN Location.dbo.CityToParish cp ON lc.Parish = cp.Parish
+JOIN AirPollution.dbo.BatonRouge ap ON ap.City = cp.City
+WHERE ap.PM25 IS NOT NULL
+ORDER BY lc.CountOfCases DESC;
+END
+GO
+
+-- Query for finding Highest number of cases for specific year for specific location
+SELECT TOP 1 lc.Year AS Highest_Year, cp.City AS Highest_City, ap.PM25 AS PM25_reading, lc.CountOfCases
+FROM LungCancer.dbo.LungCancerRates lc
+JOIN Location.dbo.CityToParish cp ON lc.Parish = cp.Parish
+JOIN AirPollution.dbo.BatonRouge ap ON ap.City = cp.City
+WHERE ap.PM25 IS NOT NULL
+ORDER BY lc.CountOfCases DESC;
+
+GO
+
+-- Stored Procedure for getting the Lowest number of cases for specific year for specific location
+CREATE or ALTER PROCEDURE Lowest_Lung_Cancer_Cases
+@Lowest_Year INT OUTPUT,
+@Lowest_City VARCHAR(50) OUTPUT
+AS
+BEGIN
+SELECT TOP 1 @Lowest_Year = lc.Year, @Lowest_City = cp.City
+FROM LungCancer.dbo.LungCancerRates lc
+JOIN Location.dbo.CityToParish cp ON lc.Parish = cp.Parish
+JOIN AirPollution.dbo.BatonRouge ap ON ap.City = cp.City
+WHERE ap.PM25 IS NOT NULL
+ORDER BY lc.CountOfCases;
+END
+GO
+
+-- Query for finding Lowest number of cases for specific year for specific location
+SELECT TOP 1 lc.Year AS Lowest_Year, cp.City AS Lowest_City, ap.PM25 AS PM25_reading, lc.CountOfCases
+FROM LungCancer.dbo.LungCancerRates lc
+JOIN Location.dbo.CityToParish cp ON lc.Parish = cp.Parish
+JOIN AirPollution.dbo.BatonRouge ap ON ap.City = cp.City
+WHERE ap.PM25 IS NOT NULL
+ORDER BY lc.CountOfCases DESC;
+GO
+
+-- Stored Procedure for getting the Average of cases for specific year for specific location
+CREATE or ALTER PROCEDURE Average_Lung_Cancer_Cases 
+@Given_Year INT,
+@Average_Count INT OUTPUT
+AS
+BEGIN
+SELECT @Average_Count = AVG(lc.CountOfCases)
+FROM LungCancer.dbo.LungCancerRates lc
+JOIN Location.dbo.CityToParish cp ON lc.Parish = cp.Parish
+JOIN AirPollution.dbo.BatonRouge ap ON ap.City = cp.City
+WHERE ap.PM25 IS NOT NULL;
+END
+GO
+
+-- Query for finding Average of cases for specific year for specific location
+SELECT AVG(lc.CountOfCases) AS AverageOfCases
+FROM LungCancer.dbo.LungCancerRates lc
+JOIN Location.dbo.CityToParish cp ON lc.Parish = cp.Parish
+JOIN AirPollution.dbo.BatonRouge ap ON ap.City = cp.City
+WHERE ap.PM25 IS NOT NULL;
+GO
+
+-------------------------------------------------------------------------------
+
+-- Inserting the Data in Air Pollution DB
+CREATE OR ALTER PROCEDURE Insert_In_Air_Pollution_DB 
+    @Given_Date DATE,
+    @Given_City VARCHAR(50),
+    @Given_PM25 FLOAT
+AS
+BEGIN
+    DECLARE @SQL_Query NVARCHAR(MAX);
+
+    SET @SQL_Query = 'INSERT INTO AirPollution.dbo.BatonRouge (City, Date, PM25) VALUES (''' + @Given_City + ''', ''' + CONVERT(NVARCHAR(10), @Given_Date, 120) + ''', ' + CONVERT(NVARCHAR(50), @Given_PM25) + ')';
+    PRINT @SQL_Query;
+
+    EXEC sp_executesql @SQL_Query;
+END
+GO
+
+EXEC Insert_In_Air_Pollution_DB '2024-09-13', 'BatonRouge/Capitol1', 5.6;
+GO
+
+select * from AirPollution.dbo.BatonRouge where Date = '2024-09-13';
+
+GO
+
+-- Inserting the Data in Lung Cancer DB
+CREATE OR ALTER PROCEDURE Insert_In_Lung_Cancer_DB 
+    @Given_Year smallint,
+    @Given_Parish VARCHAR(50),
+    @Given_Rate FLOAT,
+    @Given_Count int,
+    @Given_Population int
+AS
+BEGIN
+    DECLARE @SQL_Query NVARCHAR(MAX);
+
+    SET @SQL_Query = 'INSERT INTO LungCancer.dbo.LungCancerRates (Year, Parish, Rate, CountOfCases, Population) VALUES 
+	(' + CONVERT(NVARCHAR(10), @Given_Year) + ',''' + @Given_Parish + ''', ' + CONVERT(NVARCHAR(50), @Given_Rate) + ', ' + CONVERT(NVARCHAR(50), @Given_Count) + 
+	', ' + CONVERT(NVARCHAR(50), @Given_Population) + ')';
+    PRINT @SQL_Query;
+
+    EXEC sp_executesql @SQL_Query;
+END
+GO
+
+EXEC Insert_In_Lung_Cancer_DB 2024, 'EastBatonRouge', 56, 77, 1700;
+GO
+
+select * from LungCancer.dbo.LungCancerRates where Year = '2024';
+
+GO
+
+-- Inserting the Data in Location DB
+CREATE OR ALTER PROCEDURE Insert_In_Location_DB
+    @Given_City VARCHAR(50),
+    @Given_Parish VARCHAR(50)
+AS
+BEGIN
+    DECLARE @SQL_Query NVARCHAR(MAX);
+
+    SET @SQL_Query = 'INSERT INTO Location.dbo.CityToParish (City, Parish) VALUES 
+	(''' + @Given_City + ''', ''' + @Given_Parish + ''')';
+    PRINT @SQL_Query;
+
+    EXEC sp_executesql @SQL_Query;
+END
+GO
+
+EXEC Insert_In_Location_DB 'mrid', 'dula';
+GO
+
+select * from Location.dbo.CityToParish where City = 'mrid';
+GO
